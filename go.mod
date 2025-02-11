@@ -7,6 +7,8 @@ require (
 	github.com/spf13/pflag v1.0.5
 )
 
+replace github.com/browserutils/kooky v0.2.2 => github.com/DP19/kooky v0.2.4
+
 require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-sqlite/sqlite3 v0.0.0-20180313105335-53dd8e640ee7 // indirect

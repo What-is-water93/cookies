@@ -4,8 +4,6 @@ github.com/Velocidex/ordereddict v0.0.0-20230909174157-2aa49cc5d11d h1:fn372EqKy
 github.com/Velocidex/ordereddict v0.0.0-20230909174157-2aa49cc5d11d/go.mod h1:+MqO5UMBemyFSm+yRXslbpFTwPUDhFHUf7HPV92twg4=
 github.com/Velocidex/yaml/v2 v2.2.8 h1:GUrSy4SBJ6RjGt43k6MeBKtw2z/27gh4A3hfFmFY3No=
 github.com/Velocidex/yaml/v2 v2.2.8/go.mod h1:PlXIg/Pxmoja48C1vMHo7C5pauAZvLq/UEPOQ3DsjS4=
-github.com/browserutils/kooky v0.2.2 h1:uLKlE294eXudGEAt/NjOrL5Nzbi57ZtkuWwKZ1hT13I=
-github.com/browserutils/kooky v0.2.2/go.mod h1:Ls7BAtUgrzzi5AfD1T4CqDu7mhHAaGMwCx6kH2nnjHI=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-ini/ini v1.67.0 h1:z6ZrTEZqSWOTyH2FlglNbNgARyHG8oLW9gMELqKr06A=

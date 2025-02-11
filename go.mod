@@ -1,6 +1,6 @@
 module github.com/What-is-water93/cookies
 
-go 1.23.0
+go 1.23.6
 
 require (
 	github.com/browserutils/kooky v0.2.2

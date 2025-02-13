@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -20,6 +22,7 @@ var (
 	browser           string
 	curl              bool
 	domain            string
+	fzfMode           bool
 	name              string
 	fullCookieInfo    bool
 	showExpired       bool
@@ -43,6 +46,7 @@ func parseFlags() error {
 	pflag.BoolVarP(&curl, "curl", "c", false, "outputs a curl command using all valid existing cookies for domain")
 	pflag.BoolVarP(&showExpired, "expired", "e", false, "show expired cookies")
 	pflag.BoolVarP(&fullCookieInfo, "full", "f", false, "outputs full information about each cookie")
+	pflag.BoolVarP(&fzfMode, "fuzzy", "z", false, "enable fuzzy search mode for cookies")
 	pflag.StringVarP(&name, "name", "n", "", "prints only the value of the given cookie (exact name match)")
 	pflag.BoolVarP(&debug, "log-debug", "l", false, "logs cookie store errors, which are usually safe to ignore")
 	pflag.BoolVarP(&help, "help", "h", false, "display usage information")
@@ -97,6 +101,50 @@ func getCookies(browser string, domain string) ([]*kooky.Cookie, error) {
 	}
 
 	return cookies, nil
+}
+
+func fuzzyCookieSearch(cookies []*kooky.Cookie) (*kooky.Cookie, error) {
+	cookieMap := make(map[string]*kooky.Cookie, len(cookies))
+	for _, cookie := range cookies {
+		cookieMap[cookie.Name] = cookie
+	}
+
+	cmd := exec.Command("fzf", "--height", "40%")
+	cmd.Stderr = os.Stderr
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start fzf: %w", err)
+	}
+
+	go func() {
+		defer stdin.Close()
+		for name := range cookieMap {
+			fmt.Fprintln(stdin, name)
+		}
+	}()
+
+	output, err := io.ReadAll(stdout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read fzf output: %w", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("fzf returned %w", err)
+	}
+
+	selected := strings.TrimSpace(string(output))
+
+	return cookieMap[selected], nil
 }
 
 func serializeCookiesToJson(cookies []*kooky.Cookie) (string, error) {
@@ -197,6 +245,20 @@ func run() error {
 			return fmt.Errorf("failed to marshal errors to json: %w", err)
 		}
 		fmt.Println(jsonCookieStoreErrors)
+	}
+
+	if fzfMode {
+		selectedCookie, err := fuzzyCookieSearch(cookies)
+		if err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) && exitErr.ExitCode() == 130 {
+				fmt.Println("cookie selection cancelled")
+				return nil
+			}
+			return fmt.Errorf("fuzzy search failed: %w", err)
+		}
+		fmt.Println(selectedCookie.Value)
+		return nil
 	}
 
 	if name != "" {

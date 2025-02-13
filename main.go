@@ -18,18 +18,21 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var (
-	browser           string
-	curl              bool
-	domain            string
-	fzfMode           bool
-	name              string
-	fullCookieInfo    bool
-	showExpired       bool
-	help              bool
-	cookieStoreErrors []string
-	debug             bool
+const (
+	defaultBrowser = "chrome"
 )
+
+type Config struct {
+	browser        string
+	curl           bool
+	domain         string
+	fzfMode        bool
+	name           string
+	fullCookieInfo bool
+	showExpired    bool
+	help           bool
+	debug          bool
+}
 
 func printUsage() {
 	fmt.Println("Obtain cookies from your browser stores")
@@ -40,36 +43,37 @@ func printUsage() {
 	os.Exit(0)
 }
 
-func parseFlags() error {
-	pflag.StringVarP(&domain, "domain", "d", "", "cookie domain filter (partial). Required")
-	pflag.StringVarP(&browser, "browser", "b", "chrome", "The browser you want to obtain cookies from")
-	pflag.BoolVarP(&curl, "curl", "c", false, "outputs a curl command using all valid existing cookies for domain")
-	pflag.BoolVarP(&showExpired, "expired", "e", false, "show expired cookies")
-	pflag.BoolVarP(&fullCookieInfo, "full", "f", false, "outputs full information about each cookie")
-	pflag.BoolVarP(&fzfMode, "fuzzy", "z", false, "enable fuzzy search mode for cookies")
-	pflag.StringVarP(&name, "name", "n", "", "prints only the value of the given cookie (exact name match)")
-	pflag.BoolVarP(&debug, "log-debug", "l", false, "logs cookie store errors, which are usually safe to ignore")
-	pflag.BoolVarP(&help, "help", "h", false, "display usage information")
+func parseFlags(cfg *Config) error {
+	pflag.StringVarP(&cfg.domain, "domain", "d", "", "cookie domain filter (partial). Required")
+	pflag.StringVarP(&cfg.browser, "browser", "b", defaultBrowser, "The browser you want to obtain cookies from")
+	pflag.BoolVarP(&cfg.curl, "curl", "c", false, "outputs a curl command using all valid existing cookies for domain")
+	pflag.BoolVarP(&cfg.showExpired, "expired", "e", false, "show expired cookies")
+	pflag.BoolVarP(&cfg.fullCookieInfo, "full", "f", false, "outputs full information about each cookie")
+	pflag.BoolVarP(&cfg.fzfMode, "fuzzy", "z", false, "enable fuzzy search for all cookies of a domain (requires fzf)")
+	pflag.StringVarP(&cfg.name, "name", "n", "", "prints only the value of the given cookie (exact name match)")
+	pflag.BoolVarP(&cfg.debug, "log-debug", "l", false, "logs cookie store errors, which are usually safe to ignore")
+	pflag.BoolVarP(&cfg.help, "help", "h", false, "display usage information")
 	pflag.Parse()
 
-	if help || pflag.NFlag() == 0 {
+	if cfg.help || pflag.NFlag() == 0 {
 		printUsage()
 	}
 
-	if domain == "" {
+	if cfg.domain == "" {
 		return errors.New("flag domain is required, use either -d $DOMAIN or --domain $DOMAIN")
 	}
 
-	if curl && name != "" {
+	if cfg.curl && cfg.name != "" {
 		return errors.New("flag 'curl' and flag 'name' are mutually exclusive")
 	}
 
 	return nil
 }
 
-func getCookies(browser string, domain string) ([]*kooky.Cookie, error) {
+func getCookies(browser string, domain string, showExpired bool) ([]*kooky.Cookie, []string, error) {
 	var cookies []*kooky.Cookie
 	cookieStores := kooky.FindAllCookieStores()
+	var cookieStoreErrors []string
 
 	for _, store := range cookieStores {
 		defer store.Close()
@@ -91,16 +95,24 @@ func getCookies(browser string, domain string) ([]*kooky.Cookie, error) {
 		storeCookies, err := store.ReadCookies(filters...)
 		if err != nil {
 			cookieStoreErrors = append(cookieStoreErrors, err.Error())
+			continue
 		}
 
-		cookies = append(cookies, storeCookies...)
+		if len(storeCookies) > 0 {
+			cookies = append(cookies, storeCookies...)
+		}
 	}
 
 	if cookies == nil {
-		return nil, errors.New("no cookies for browser " + browser + " and domain " + domain + " found.")
+		return nil, cookieStoreErrors, fmt.Errorf("no cookies found for browser %s and domain %s", browser, domain)
 	}
 
-	return cookies, nil
+	return cookies, cookieStoreErrors, nil
+}
+
+func isFzfInstalled() bool {
+	_, err := exec.LookPath("fzf")
+	return err == nil
 }
 
 func fuzzyCookieSearch(cookies []*kooky.Cookie) (*kooky.Cookie, error) {
@@ -162,13 +174,13 @@ func serializeCookiesToJson(cookies []*kooky.Cookie) (string, error) {
 	return string(cookiesJsonBytes), nil
 }
 
-func serializeFullCookieInfoToJson(cookies []*kooky.Cookie) (string, error) {
-	cookiesMap := make(map[string]map[string]interface{})
+func serializeFullCookieInfoToJson(cookies []*kooky.Cookie, browser string) (string, error) {
+	cookiesMap := make(map[string]map[string]interface{}, len(cookies))
 
 	for _, item := range cookies {
-		cookieMap := make(map[string]interface{})
 		v := reflect.ValueOf(item).Elem()
 		t := v.Type()
+		cookieMap := make(map[string]interface{}, v.NumField())
 
 		for i := 0; i < v.NumField(); i++ {
 			field := t.Field(i)
@@ -191,7 +203,7 @@ func serializeFullCookieInfoToJson(cookies []*kooky.Cookie) (string, error) {
 }
 
 func createCurlCommand(cookies []*kooky.Cookie, domain string) string {
-	var cookieParts []string
+	cookieParts := make([]string, 0, len(cookies))
 
 	for _, cookie := range cookies {
 		cookieParts = append(cookieParts, fmt.Sprintf("%s=%s", cookie.Name, cookie.Value))
@@ -214,7 +226,7 @@ func getCookieValue(cookies []*kooky.Cookie, name string) (string, error) {
 	return "", errors.New("cookie does not exist")
 }
 
-func formatStoreErrorsAsJson() (string, error) {
+func formatStoreErrorsAsJson(cookieStoreErrors []string) (string, error) {
 	jsonErrors := make(map[string]string, len(cookieStoreErrors))
 	for i, v := range cookieStoreErrors {
 		key := strconv.Itoa(i + 1)
@@ -229,25 +241,29 @@ func formatStoreErrorsAsJson() (string, error) {
 	return string(jsonErrorsString), nil
 }
 
-func run() error {
-	err := parseFlags()
+func run(cfg Config) error {
+	err := parseFlags(&cfg)
 	if err != nil {
 		return fmt.Errorf("incorrect flag usage: %w", err)
 	}
 
-	cookies, err := getCookies(browser, domain)
+	if cfg.fzfMode && !isFzfInstalled() {
+		return fmt.Errorf("fzf is not in PATH. Please install fzf and add it to PATH to use fuzzy search mode")
+	}
+
+	cookies, cookieStoreErrors, err := getCookies(cfg.browser, cfg.domain, cfg.showExpired)
 	if err != nil {
 		return fmt.Errorf("failed to obtain cookies: %w", err)
 	}
-	if debug {
-		jsonCookieStoreErrors, err := formatStoreErrorsAsJson()
+	if cfg.debug {
+		jsonCookieStoreErrors, err := formatStoreErrorsAsJson(cookieStoreErrors)
 		if err != nil {
 			return fmt.Errorf("failed to marshal errors to json: %w", err)
 		}
 		fmt.Println(jsonCookieStoreErrors)
 	}
 
-	if fzfMode {
+	if cfg.fzfMode {
 		selectedCookie, err := fuzzyCookieSearch(cookies)
 		if err != nil {
 			var exitErr *exec.ExitError
@@ -261,20 +277,20 @@ func run() error {
 		return nil
 	}
 
-	if name != "" {
-		cookie_value, err := getCookieValue(cookies, name)
+	if cfg.name != "" {
+		cookie_value, err := getCookieValue(cookies, cfg.name)
 		if err != nil {
-			return fmt.Errorf("failed to get value for cookie %s: %w", name, err)
+			return fmt.Errorf("failed to get value for cookie %s: %w", cfg.name, err)
 		}
 		fmt.Println(cookie_value)
 
-	} else if curl {
+	} else if cfg.curl {
 		fmt.Println(
-			createCurlCommand(cookies, domain),
+			createCurlCommand(cookies, cfg.domain),
 		)
 
-	} else if fullCookieInfo {
-		cookieJson, err := serializeFullCookieInfoToJson(cookies)
+	} else if cfg.fullCookieInfo {
+		cookieJson, err := serializeFullCookieInfoToJson(cookies, cfg.browser)
 		if err != nil {
 			return fmt.Errorf("failed to create JSON: %w", err)
 		}
@@ -290,7 +306,8 @@ func run() error {
 }
 
 func main() {
-	if err := run(); err != nil {
+	config := Config{}
+	if err := run(config); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -121,7 +121,7 @@ func fuzzyCookieSearch(cookies []*kooky.Cookie) (*kooky.Cookie, error) {
 		cookieMap[cookie.Name] = cookie
 	}
 
-	cmd := exec.Command("fzf", "--height", "40%")
+	cmd := exec.Command("fzf", "--height", "99%")
 	cmd.Stderr = os.Stderr
 
 	stdin, err := cmd.StdinPipe()

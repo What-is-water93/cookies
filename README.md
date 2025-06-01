@@ -1,3 +1,6 @@
+This is a thin wrapper around the [browserutils/kooky](https://github.com/browserutils/kooky/) library, they did all the hard work.  
+My tool only adds a CLI I like around the library, e.g. fuzzy selection and flags I find more intuitive.
+
 # Build the binary
 In the directory:
 1. Install go (`mise install`/`asdf install`)

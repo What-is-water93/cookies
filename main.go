@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	defaultBrowser = "chrome"
+	defaultBrowser     = "chrome"
+	cryptoErrorMessage = "chrome cookie store has returned a malformed cookie value - try using a more specific domain filter to avoid problematic cookies"
 )
 
 var (
@@ -84,16 +85,56 @@ func parseFlags(cfg *Config) error {
 	return nil
 }
 
-func getCookies(browser string, domain string, showExpired bool) ([]*kooky.Cookie, []string, error) {
+func debugCookieStore(store kooky.CookieStore, storeNum int) {
+
+	fmt.Fprintf(os.Stderr, "Debug: Store %d Details:\n", storeNum)
+	fmt.Fprintf(os.Stderr, "  Browser: %s\n", store.Browser())
+	fmt.Fprintf(os.Stderr, "  File: %s\n", store.FilePath())
+
+	if info, err := os.Stat(store.FilePath()); err == nil {
+		fmt.Fprintf(os.Stderr, "  Size: %d bytes\n", info.Size())
+		fmt.Fprintf(os.Stderr, "  Modified: %s\n", info.ModTime().Format("2006-01-02 15:04:05"))
+	} else {
+		fmt.Fprintf(os.Stderr, "  Error accessing file: %v\n", err)
+	}
+}
+
+func isCryptoError(r any, browser string) bool {
+	if r == nil {
+		return false
+	}
+
+	if browser != "chrome" {
+		return false
+	}
+
+	errorStr := fmt.Sprintf("%v", r)
+
+	return strings.Contains(errorStr, "crypto/cipher: input not full blocks")
+}
+
+func getCookies(browser string, domain string, showExpired bool, debug bool) ([]*kooky.Cookie, []string, error) {
+	if debug {
+		fmt.Fprintf(os.Stderr, "Debug: Starting getCookies for browser=%s, domain=%s, showExpired=%v\n", browser, domain, showExpired)
+	}
+
 	var cookies []*kooky.Cookie
 	cookieStores := kooky.FindAllCookieStores()
 	var cookieStoreErrors []string
 
-	for _, store := range cookieStores {
+	if debug {
+		fmt.Fprintf(os.Stderr, "Debug: Found %d cookie stores\n", len(cookieStores))
+	}
+
+	for i, store := range cookieStores {
 		defer store.Close()
 
 		if store.Browser() != browser {
 			continue
+		}
+
+		if debug {
+			debugCookieStore(store, i+1)
 		}
 
 		var filters []kooky.Filter
@@ -106,15 +147,56 @@ func getCookies(browser string, domain string, showExpired bool) ([]*kooky.Cooki
 
 		// Errors reading cookie stores are usually safe to ignore
 		// An example would be a non existant cookie store for an unused chrome profile
-		storeCookies, err := store.ReadCookies(filters...)
+
+		// Add panic recovery around ReadCookies
+		var storeCookies []*kooky.Cookie
+		var err error
+		if err := func() (returnErr error) {
+			defer func() {
+				if r := recover(); r != nil {
+					if isCryptoError(r, browser) {
+						if debug {
+							fmt.Fprintf(os.Stderr, "Debug: Recovered from Chrome crypto error in store %d: %v\n", i+1, r)
+						}
+						returnErr = fmt.Errorf(cryptoErrorMessage)
+					} else {
+						// Re-panic if it's not a crypto error
+						panic(r)
+					}
+				}
+			}()
+
+			if debug {
+				fmt.Fprintf(os.Stderr, "Debug: Reading cookies from store %d\n", i+1)
+			}
+			storeCookies, err = store.ReadCookies(filters...)
+			if debug && err == nil {
+				fmt.Fprintf(os.Stderr, "Debug: Store %d returned %d cookies\n", i+1, len(storeCookies))
+			}
+
+			return nil
+		}(); err != nil {
+			return nil, nil, err
+		}
+
 		if err != nil {
+			if debug {
+				fmt.Fprintf(os.Stderr, "Debug: Store %d error: %v\n", i+1, err)
+			}
 			cookieStoreErrors = append(cookieStoreErrors, err.Error())
 			continue
 		}
 
 		if len(storeCookies) > 0 {
 			cookies = append(cookies, storeCookies...)
+			if debug {
+				fmt.Fprintf(os.Stderr, "Debug: Added %d cookies from store %d\n", len(storeCookies), i+1)
+			}
 		}
+	}
+
+	if debug {
+		fmt.Fprintf(os.Stderr, "Debug: Total cookies found: %d, errors: %d\n", len(cookies), len(cookieStoreErrors))
 	}
 
 	if cookies == nil {
@@ -265,7 +347,7 @@ func run(cfg Config) error {
 		return fmt.Errorf("fzf is not in PATH. Please install fzf and add it to PATH to use fuzzy search mode")
 	}
 
-	cookies, cookieStoreErrors, err := getCookies(cfg.browser, cfg.domain, cfg.showExpired)
+	cookies, cookieStoreErrors, err := getCookies(cfg.browser, cfg.domain, cfg.showExpired, cfg.debug)
 	if err != nil {
 		return fmt.Errorf("failed to obtain cookies: %w", err)
 	}

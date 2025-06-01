@@ -9,3 +9,9 @@ In the directory:
 `./cookie -d "$DOMAINPATTERN"` will return  all chrome cookies for domains containing the domainpattern. The `-d` flag is required.  
 Firefox is also supported, and you can also output a curl command containing all the cookies, or print the value of a specific given cookie for the given domain.
 For further info run `cookie` or `cookie -h` to show infos about supported flags.
+
+# Known Issues
+## Chrome
+- There might be some sites with encrypted cookie values which do contain partial AES blocks of less than 16 bytes, resulting in a crypto/cipher panic and failed decryption for the specific cookie store. I was not able to figure out why I have those malformed cookies, the on. 
+My workaround is to avoid using e.g. single letter domain filters, since those often catch malformed cookies.
+  - Showing expired cookies too (`-e`)has a higher chance of running into this error.

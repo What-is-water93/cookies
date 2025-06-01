@@ -15,6 +15,6 @@ For further info run `cookie` or `cookie -h` to show infos about supported flags
 
 # Known Issues
 ## Chrome
-- There might be some sites with encrypted cookie values which do contain partial AES blocks of less than 16 bytes, resulting in a crypto/cipher panic and failed decryption for the specific cookie store. I was not able to figure out why I have those malformed cookies, the on. 
+- There might be some sites with encrypted cookie values which do contain partial AES blocks of less than 16 bytes, resulting in a crypto/cipher panic and failed decryption for the specific cookie store. I was not able to figure out why I have those malformed cookies. 
 My workaround is to avoid using e.g. single letter domain filters, since those often catch malformed cookies.
-  - Showing expired cookies too (`-e`)has a higher chance of running into this error.
+  - Showing expired cookies too (`-e`) has a higher chance of running into this error.

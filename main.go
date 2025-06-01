@@ -22,6 +22,11 @@ const (
 	defaultBrowser = "chrome"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
 type Config struct {
 	browser        string
 	curl           bool
@@ -32,10 +37,12 @@ type Config struct {
 	showExpired    bool
 	help           bool
 	debug          bool
+	version        bool
 }
 
 func printUsage() {
 	fmt.Println("Obtain cookies from your browser stores")
+	fmt.Printf("Version %s (commit: %s)\n", version, commit)
 	fmt.Println("\nUse with the following flags:")
 	pflag.CommandLine.SortFlags = false
 	pflag.PrintDefaults()
@@ -51,12 +58,19 @@ func parseFlags(cfg *Config) error {
 	pflag.BoolVarP(&cfg.fullCookieInfo, "full", "f", false, "outputs full information about each cookie")
 	pflag.BoolVarP(&cfg.fzfMode, "fuzzy", "z", false, "enable fuzzy search for all cookies of a domain (requires fzf)")
 	pflag.StringVarP(&cfg.name, "name", "n", "", "prints only the value of the given cookie (exact name match)")
+	pflag.BoolVarP(&cfg.version, "version", "v", false, "display version information") // Add this line
 	pflag.BoolVarP(&cfg.debug, "log-debug", "l", false, "logs cookie store errors, which are usually safe to ignore")
+
 	pflag.BoolVarP(&cfg.help, "help", "h", false, "display usage information")
 	pflag.Parse()
 
 	if cfg.help || pflag.NFlag() == 0 {
 		printUsage()
+	}
+
+	if cfg.version {
+		fmt.Printf("cookies version %s (commit: %s)\n", version, commit)
+		os.Exit(0)
 	}
 
 	if cfg.domain == "" {

@@ -4,7 +4,7 @@ go 1.24.3
 
 require (
 	github.com/browserutils/kooky v0.2.2
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/pflag v1.0.7
 )
 
 replace github.com/browserutils/kooky v0.2.2 => github.com/DP19/kooky v0.2.4

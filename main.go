@@ -127,7 +127,11 @@ func getCookies(browser string, domain string, showExpired bool, debug bool) ([]
 	}
 
 	for i, store := range cookieStores {
-		defer store.Close()
+		defer func() {
+			if err := store.Close(); err != nil && debug {
+				fmt.Fprintf(os.Stderr, "Debug: Error closing store %d: %v\n", i+1, err)
+			}
+		}()
 
 		if store.Browser() != browser {
 			continue
@@ -158,7 +162,7 @@ func getCookies(browser string, domain string, showExpired bool, debug bool) ([]
 						if debug {
 							fmt.Fprintf(os.Stderr, "Debug: Recovered from Chrome crypto error in store %d: %v\n", i+1, r)
 						}
-						returnErr = fmt.Errorf(cryptoErrorMessage)
+						returnErr = errors.New(cryptoErrorMessage)
 					} else {
 						// Re-panic if it's not a crypto error
 						panic(r)
@@ -211,7 +215,7 @@ func isFzfInstalled() bool {
 	return err == nil
 }
 
-func fuzzyCookieSearch(cookies []*kooky.Cookie) (*kooky.Cookie, error) {
+func fuzzyCookieSearch(cookies []*kooky.Cookie, debug bool) (*kooky.Cookie, error) {
 	cookieMap := make(map[string]*kooky.Cookie, len(cookies))
 	for _, cookie := range cookies {
 		cookieMap[cookie.Name] = cookie
@@ -235,9 +239,15 @@ func fuzzyCookieSearch(cookies []*kooky.Cookie) (*kooky.Cookie, error) {
 	}
 
 	go func() {
-		defer stdin.Close()
+		defer func() {
+			if err := stdin.Close(); err != nil && debug {
+				fmt.Fprintf(os.Stderr, "Debug: Error closing fzf stdin: %v\n", err)
+			}
+		}()
 		for name := range cookieMap {
-			fmt.Fprintln(stdin, name)
+			if _, err := fmt.Fprintln(stdin, name); err != nil && debug {
+				fmt.Fprintf(os.Stderr, "Debug: Error writing to fzf stdin: %v\n", err)
+			}
 		}
 	}()
 
@@ -360,7 +370,7 @@ func run(cfg Config) error {
 	}
 
 	if cfg.fzfMode {
-		selectedCookie, err := fuzzyCookieSearch(cookies)
+		selectedCookie, err := fuzzyCookieSearch(cookies, cfg.debug)
 		if err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) && exitErr.ExitCode() == 130 {

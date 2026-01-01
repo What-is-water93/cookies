@@ -13,4 +13,18 @@ build-release:
 
 .PHONY: clean
 clean:
-	rm -f cookies
+	rm -f cookies testserver
+
+TAG ?= github.com/what-is-water93/cookies
+
+.PHONY: docker-build
+docker-build:
+	docker build -t $(TAG) .
+
+.PHONY: docker-test
+docker-test:
+	docker run --rm -v $(PWD)/tests/verify.sh:/app/tests/verify.sh:z $(TAG) /app/tests/verify.sh
+
+.PHONY: lint
+lint:
+	golangci-lint run

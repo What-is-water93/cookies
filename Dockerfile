@@ -24,7 +24,6 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 COPY . .
+RUN echo 'eval "$(mise activate bash)"' >> ~/.bashrc
 RUN mise install
 RUN mise exec -- go mod download
-RUN CGO_ENABLED=0 mise exec -- go build -o cookies .
-RUN CGO_ENABLED=0 mise exec -- go build -o testserver ./tests/server.go

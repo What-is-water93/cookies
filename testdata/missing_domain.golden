@@ -1,0 +1,1 @@
+incorrect flag usage: flag domain is required, use either -d $DOMAIN or --domain $DOMAIN

@@ -1,0 +1,14 @@
+Obtain cookies from your browser stores
+Version test (commit: abc123)
+
+Use with the following flags:
+  -d, --domain string    cookie domain filter (partial). Required
+  -b, --browser string   The browser you want to obtain cookies from (default "chrome")
+  -c, --curl             outputs a curl command using all valid existing cookies for domain
+  -e, --expired          show expired cookies
+  -f, --full             outputs full information about each cookie
+  -z, --fuzzy            enable fuzzy search for all cookies of a domain (requires fzf)
+  -n, --name string      prints only the value of the given cookie (exact name match)
+  -v, --version          display version information
+  -l, --log-debug        logs cookie store errors, which are usually safe to ignore
+  -h, --help             display usage information

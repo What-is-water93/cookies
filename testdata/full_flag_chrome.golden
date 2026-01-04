@@ -1,0 +1,32 @@
+{
+  "another-cookie": {
+    "Creation": "NORMALIZED_TIMESTAMP",
+    "Domain": "localhost",
+    "Expires": "NORMALIZED_TIMESTAMP",
+    "HttpOnly": false,
+    "MaxAge": 0,
+    "Name": "another-cookie",
+    "Path": "/",
+    "Raw": "",
+    "RawExpires": "",
+    "SameSite": 0,
+    "Secure": false,
+    "Unparsed": null,
+    "Value": "also-present"
+  },
+  "test-cookie": {
+    "Creation": "NORMALIZED_TIMESTAMP",
+    "Domain": "localhost",
+    "Expires": "NORMALIZED_TIMESTAMP",
+    "HttpOnly": false,
+    "MaxAge": 0,
+    "Name": "test-cookie",
+    "Path": "/",
+    "Raw": "",
+    "RawExpires": "",
+    "SameSite": 0,
+    "Secure": false,
+    "Unparsed": null,
+    "Value": "present"
+  }
+}

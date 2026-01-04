@@ -23,7 +23,7 @@ docker-build:
 
 .PHONY: docker-test
 docker-test:
-	docker run --rm -v $(PWD)/tests/verify.sh:/app/tests/verify.sh:z $(TAG) /app/tests/verify.sh
+	docker run --rm  $(TAG) mise exec -- go test -v
 
 .PHONY: lint
 lint:

@@ -1,0 +1,55 @@
+STDERR:
+Debug: Starting getCookies for browser=chrome, domain=localhost, showExpired=false
+Debug: Found N cookie stores
+Debug: Store N Details:
+  Browser: chrome
+  File: /PATH/Cookies
+  Error accessing file: stat /PATH/Cookies: no such file or directory
+Debug: Reading cookies from Store N
+Debug: Store N error: open /PATH/Cookies: no such file or directory
+Debug: Store N Details:
+  Browser: chrome
+  File: /PATH/Cookies
+  Size: N bytes
+  Modified: TIMESTAMP
+Debug: Reading cookies from Store N
+Debug: Store N returned 2 cookies
+Debug: Added 2 cookies from Store N
+Debug: Total cookies found: 2, errors: N
+
+STDOUT:
+{
+  "1": "open /PATH/Cookies: no such file or directory"
+}
+{
+  "another-cookie": {
+    "Creation": "NORMALIZED_TIMESTAMP",
+    "Domain": "localhost",
+    "Expires": "NORMALIZED_TIMESTAMP",
+    "HttpOnly": false,
+    "MaxAge": 0,
+    "Name": "another-cookie",
+    "Path": "/",
+    "Raw": "",
+    "RawExpires": "",
+    "SameSite": 0,
+    "Secure": false,
+    "Unparsed": null,
+    "Value": "also-present"
+  },
+  "test-cookie": {
+    "Creation": "NORMALIZED_TIMESTAMP",
+    "Domain": "localhost",
+    "Expires": "NORMALIZED_TIMESTAMP",
+    "HttpOnly": false,
+    "MaxAge": 0,
+    "Name": "test-cookie",
+    "Path": "/",
+    "Raw": "",
+    "RawExpires": "",
+    "SameSite": 0,
+    "Secure": false,
+    "Unparsed": null,
+    "Value": "present"
+  }
+}

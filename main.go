@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -46,6 +45,7 @@ func printUsage() {
 	fmt.Printf("Version %s (commit: %s)\n", version, commit)
 	fmt.Println("\nUse with the following flags:")
 	pflag.CommandLine.SortFlags = false
+	pflag.CommandLine.SetOutput(os.Stdout)
 	pflag.PrintDefaults()
 
 	os.Exit(0)
@@ -59,7 +59,7 @@ func parseFlags(cfg *Config) error {
 	pflag.BoolVarP(&cfg.fullCookieInfo, "full", "f", false, "outputs full information about each cookie")
 	pflag.BoolVarP(&cfg.fzfMode, "fuzzy", "z", false, "enable fuzzy search for all cookies of a domain (requires fzf)")
 	pflag.StringVarP(&cfg.name, "name", "n", "", "prints only the value of the given cookie (exact name match)")
-	pflag.BoolVarP(&cfg.version, "version", "v", false, "display version information") // Add this line
+	pflag.BoolVarP(&cfg.version, "version", "v", false, "display version information")
 	pflag.BoolVarP(&cfg.debug, "log-debug", "l", false, "logs cookie store errors, which are usually safe to ignore")
 
 	pflag.BoolVarP(&cfg.help, "help", "h", false, "display usage information")
@@ -281,25 +281,32 @@ func serializeCookiesToJson(cookies []*kooky.Cookie) (string, error) {
 }
 
 func serializeFullCookieInfoToJson(cookies []*kooky.Cookie, browser string) (string, error) {
-	cookiesMap := make(map[string]map[string]interface{}, len(cookies))
+	cookiesMap := make(map[string]map[string]any, len(cookies))
 
 	for _, item := range cookies {
-		v := reflect.ValueOf(item).Elem()
-		t := v.Type()
-		cookieMap := make(map[string]interface{}, v.NumField())
+		cookieMap := make(map[string]any)
 
-		for i := 0; i < v.NumField(); i++ {
-			field := t.Field(i)
-			value := v.Field(i).Interface()
-			// container for cookies are only used by firefox
-			if field.Name == "Container" && browser != "firefox" {
-				continue
-			}
+		cookieMap["Name"] = item.Name
+		cookieMap["Value"] = item.Value
+		cookieMap["Path"] = item.Path
+		cookieMap["Domain"] = item.Domain
+		cookieMap["Expires"] = item.Expires.Unix()
+		cookieMap["RawExpires"] = item.RawExpires
+		cookieMap["MaxAge"] = item.MaxAge
+		cookieMap["Secure"] = item.Secure
+		cookieMap["HttpOnly"] = item.HttpOnly
+		cookieMap["SameSite"] = item.SameSite
+		cookieMap["Raw"] = item.Raw
+		cookieMap["Unparsed"] = item.Unparsed
+		cookieMap["Creation"] = item.Creation.Unix()
 
-			cookieMap[field.Name] = value
+		// Container field is only used by firefox
+		if browser == "firefox" {
+			cookieMap["Container"] = item.Container
 		}
 		cookiesMap[item.Name] = cookieMap
 	}
+
 	cookiesJsonBytes, err := json.Marshal(cookiesMap)
 	if err != nil {
 		return "", err

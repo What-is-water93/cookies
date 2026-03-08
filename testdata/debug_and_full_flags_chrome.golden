@@ -4,14 +4,13 @@ Debug: Found N cookie stores
 Debug: Store N Details:
   Browser: chrome
   File: /PATH/Cookies
-  Error accessing file: stat /PATH/Cookies: no such file or directory
+  STAT_NORMALIZED
 Debug: Reading cookies from Store N
 Debug: Store N error: open /PATH/Cookies: no such file or directory
 Debug: Store N Details:
   Browser: chrome
   File: /PATH/Cookies
-  Size: N bytes
-  Modified: TIMESTAMP
+  STAT_NORMALIZED
 Debug: Reading cookies from Store N
 Debug: Store N returned 2 cookies
 Debug: Added 2 cookies from Store N

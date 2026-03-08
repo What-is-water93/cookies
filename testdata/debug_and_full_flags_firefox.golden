@@ -4,23 +4,14 @@ Debug: Found N cookie stores
 Debug: Store N Details:
   Browser: firefox
   File: /PATH/cookies.sqlite
-  Error accessing file: stat /PATH/cookies.sqlite: no such file or directory
-Debug: Reading cookies from Store N
-Debug: Store N error: open /PATH/cookies.sqlite: no such file or directory
-Debug: Store N Details:
-  Browser: firefox
-  File: /PATH/cookies.sqlite
-  Size: N bytes
-  Modified: TIMESTAMP
+  STAT_NORMALIZED
 Debug: Reading cookies from Store N
 Debug: Store N returned 2 cookies
 Debug: Added 2 cookies from Store N
 Debug: Total cookies found: 2, errors: N
 
 STDOUT:
-{
-  "1": "open /PATH/cookies.sqlite: no such file or directory"
-}
+{}
 {
   "another-cookie": {
     "Container": "",

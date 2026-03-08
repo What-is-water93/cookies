@@ -154,9 +154,27 @@ func visitWithFirefox(t *testing.T, url string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get home directory: %v", err)
+	}
+	profileDir := filepath.Join(homeDir, ".mozilla", "firefox", "kooky.default")
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		t.Fatalf("Failed to create firefox profile dir: %v", err)
+	}
+
+	profilesIni := filepath.Join(homeDir, ".mozilla", "firefox", "profiles.ini")
+	if _, err := os.Stat(profilesIni); os.IsNotExist(err) {
+		content := "[Profile0]\nName=default\nIsRelative=1\nPath=kooky.default\nDefault=1\n"
+		if err := os.WriteFile(profilesIni, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create profiles.ini: %v", err)
+		}
+	}
+
 	cmd := exec.CommandContext(ctx, "firefox",
 		"--headless",
 		"--screenshot", "/dev/null",
+		"--profile", profileDir,
 		url,
 	)
 	_ = cmd.Run()
@@ -273,8 +291,11 @@ func normalizeDebugOutput(input string) string {
 	re = regexp.MustCompile(`\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
 	output = re.ReplaceAllString(output, "TIMESTAMP")
 
-	re = regexp.MustCompile(`Size: \d+ bytes`)
-	output = re.ReplaceAllString(output, "Size: N bytes")
+	re = regexp.MustCompile(`(?s)  Size: \d+ bytes\s*Modified: TIMESTAMP\s*`)
+	output = re.ReplaceAllString(output, "  STAT_NORMALIZED\n")
+
+	re = regexp.MustCompile(`  Error accessing file: .*`)
+	output = re.ReplaceAllString(output, "  STAT_NORMALIZED")
 
 	re = regexp.MustCompile(`Found \d+ cookie stores`)
 	output = re.ReplaceAllString(output, "Found N cookie stores")

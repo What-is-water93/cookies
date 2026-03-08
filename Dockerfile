@@ -25,5 +25,5 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY . .
 RUN echo 'eval "$(mise activate bash)"' >> ~/.bashrc
-RUN mise install
+RUN mise trust && mise install
 RUN mise exec -- go mod download

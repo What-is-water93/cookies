@@ -1,14 +1,12 @@
 module github.com/What-is-water93/cookies
 
-go 1.25.5
+go 1.26.1
 
 require (
-	github.com/browserutils/kooky v0.2.2
+	github.com/browserutils/kooky v0.2.5
 	github.com/sebdah/goldie/v2 v2.8.0
 	github.com/spf13/pflag v1.0.10
 )
-
-replace github.com/browserutils/kooky v0.2.2 => github.com/DP19/kooky v0.2.4
 
 require (
 	github.com/go-ini/ini v1.67.0 // indirect
@@ -19,8 +17,9 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/zalando/go-keyring v0.2.6 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
+	gopkg.in/ini.v1 v1.67.1 // indirect
 )

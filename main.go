@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
 
@@ -18,13 +20,13 @@ import (
 )
 
 const (
-	defaultBrowser     = "chrome"
-	cryptoErrorMessage = "chrome cookie store has returned a malformed cookie value - try using a more specific domain filter to avoid problematic cookies"
+	defaultBrowser = "chrome"
 )
 
 var (
-	version = "dev"
-	commit  = "unknown"
+	version     = "dev"
+	commit      = "unknown"
+	ErrExitZero = errors.New("exit zero")
 )
 
 type Config struct {
@@ -47,8 +49,6 @@ func printUsage() {
 	pflag.CommandLine.SortFlags = false
 	pflag.CommandLine.SetOutput(os.Stdout)
 	pflag.PrintDefaults()
-
-	os.Exit(0)
 }
 
 func parseFlags(cfg *Config) error {
@@ -67,11 +67,12 @@ func parseFlags(cfg *Config) error {
 
 	if cfg.help || pflag.NFlag() == 0 {
 		printUsage()
+		return ErrExitZero
 	}
 
 	if cfg.version {
 		fmt.Printf("cookies version %s (commit: %s)\n", version, commit)
-		os.Exit(0)
+		return ErrExitZero
 	}
 
 	if cfg.domain == "" {
@@ -86,7 +87,6 @@ func parseFlags(cfg *Config) error {
 }
 
 func debugCookieStore(store kooky.CookieStore, storeNum int) {
-
 	fmt.Fprintf(os.Stderr, "Debug: Store %d Details:\n", storeNum)
 	fmt.Fprintf(os.Stderr, "  Browser: %s\n", store.Browser())
 	fmt.Fprintf(os.Stderr, "  File: %s\n", store.FilePath())
@@ -99,94 +99,73 @@ func debugCookieStore(store kooky.CookieStore, storeNum int) {
 	}
 }
 
-func isCryptoError(r any, browser string) bool {
-	if r == nil {
-		return false
+// readCookiesFromStore reads cookies from a single cookie store, closing it when done.
+// Returns nil, nil if the store doesn't match the requested browser.
+// Returns nil, err if the store could not be read (non-fatal, caller decides).
+func readCookiesFromStore(ctx context.Context, store kooky.CookieStore, storeNum int, browser string, domain string, showExpired bool, debug bool) ([]*kooky.Cookie, error) {
+	defer func() {
+		if err := store.Close(); err != nil && debug {
+			fmt.Fprintf(os.Stderr, "Debug: Error closing store %d: %v\n", storeNum, err)
+		}
+	}()
+
+	if store.Browser() != browser {
+		return nil, nil
 	}
 
-	if browser != "chrome" {
-		return false
+	if debug {
+		debugCookieStore(store, storeNum)
 	}
 
-	errorStr := fmt.Sprintf("%v", r)
+	var filters []kooky.Filter
+	// only append the Valid filter if showExpired is false (default)
+	if !showExpired {
+		filters = append(filters, kooky.Valid)
+	}
+	filters = append(filters, kooky.DomainContains(domain))
 
-	return strings.Contains(errorStr, "crypto/cipher: input not full blocks")
+	if debug {
+		fmt.Fprintf(os.Stderr, "Debug: Reading cookies from store %d\n", storeNum)
+	}
+
+	// Errors reading cookie stores are usually safe to ignore.
+	// An example would be a non-existent cookie store for an unused chrome profile.
+	storeCookies, err := store.TraverseCookies(filters...).ReadAllCookies(ctx)
+	if err != nil {
+		if debug {
+			fmt.Fprintf(os.Stderr, "Debug: Store %d error: %v\n", storeNum, err)
+		}
+		return nil, err
+	}
+
+	if debug {
+		fmt.Fprintf(os.Stderr, "Debug: Store %d returned %d cookies\n", storeNum, len(storeCookies))
+	}
+
+	return storeCookies, nil
 }
 
-func getCookies(browser string, domain string, showExpired bool, debug bool) ([]*kooky.Cookie, []string, error) {
+func getCookies(ctx context.Context, browser string, domain string, showExpired bool, debug bool) ([]*kooky.Cookie, []string, error) {
 	if debug {
 		fmt.Fprintf(os.Stderr, "Debug: Starting getCookies for browser=%s, domain=%s, showExpired=%v\n", browser, domain, showExpired)
 	}
 
 	var cookies []*kooky.Cookie
-	cookieStores := kooky.FindAllCookieStores()
 	var cookieStoreErrors []string
+	cookieStores := kooky.FindAllCookieStores(ctx)
 
 	if debug {
 		fmt.Fprintf(os.Stderr, "Debug: Found %d cookie stores\n", len(cookieStores))
 	}
 
 	for i, store := range cookieStores {
-		defer func() {
-			if err := store.Close(); err != nil && debug {
-				fmt.Fprintf(os.Stderr, "Debug: Error closing store %d: %v\n", i+1, err)
-			}
-		}()
-
-		if store.Browser() != browser {
-			continue
+		if err := ctx.Err(); err != nil {
+			return nil, cookieStoreErrors, err
 		}
 
-		if debug {
-			debugCookieStore(store, i+1)
-		}
-
-		var filters []kooky.Filter
-		// only append the Valid filter if showExpired is false (default)
-		if !showExpired {
-			filters = append(filters, kooky.Valid)
-		}
-
-		filters = append(filters, kooky.DomainContains(domain))
-
-		// Errors reading cookie stores are usually safe to ignore
-		// An example would be a non existant cookie store for an unused chrome profile
-
-		// Add panic recovery around ReadCookies
-		var storeCookies []*kooky.Cookie
-		var err error
-		if err := func() (returnErr error) {
-			defer func() {
-				if r := recover(); r != nil {
-					if isCryptoError(r, browser) {
-						if debug {
-							fmt.Fprintf(os.Stderr, "Debug: Recovered from Chrome crypto error in store %d: %v\n", i+1, r)
-						}
-						returnErr = errors.New(cryptoErrorMessage)
-					} else {
-						// Re-panic if it's not a crypto error
-						panic(r)
-					}
-				}
-			}()
-
-			if debug {
-				fmt.Fprintf(os.Stderr, "Debug: Reading cookies from store %d\n", i+1)
-			}
-			storeCookies, err = store.ReadCookies(filters...)
-			if debug && err == nil {
-				fmt.Fprintf(os.Stderr, "Debug: Store %d returned %d cookies\n", i+1, len(storeCookies))
-			}
-
-			return nil
-		}(); err != nil {
-			return nil, nil, err
-		}
-
+		storeNum := i + 1
+		storeCookies, err := readCookiesFromStore(ctx, store, storeNum, browser, domain, showExpired, debug)
 		if err != nil {
-			if debug {
-				fmt.Fprintf(os.Stderr, "Debug: Store %d error: %v\n", i+1, err)
-			}
 			cookieStoreErrors = append(cookieStoreErrors, err.Error())
 			continue
 		}
@@ -194,7 +173,7 @@ func getCookies(browser string, domain string, showExpired bool, debug bool) ([]
 		if len(storeCookies) > 0 {
 			cookies = append(cookies, storeCookies...)
 			if debug {
-				fmt.Fprintf(os.Stderr, "Debug: Added %d cookies from store %d\n", len(storeCookies), i+1)
+				fmt.Fprintf(os.Stderr, "Debug: Added %d cookies from store %d\n", len(storeCookies), storeNum)
 			}
 		}
 	}
@@ -215,13 +194,13 @@ func isFzfInstalled() bool {
 	return err == nil
 }
 
-func fuzzyCookieSearch(cookies []*kooky.Cookie, debug bool) (*kooky.Cookie, error) {
+func fuzzyCookieSearch(ctx context.Context, cookies []*kooky.Cookie, debug bool) (*kooky.Cookie, error) {
 	cookieMap := make(map[string]*kooky.Cookie, len(cookies))
 	for _, cookie := range cookies {
 		cookieMap[cookie.Name] = cookie
 	}
 
-	cmd := exec.Command("fzf", "--height", "99%")
+	cmd := exec.CommandContext(ctx, "fzf", "--height", "99%")
 	cmd.Stderr = os.Stderr
 
 	stdin, err := cmd.StdinPipe()
@@ -354,8 +333,11 @@ func formatStoreErrorsAsJson(cookieStoreErrors []string) (string, error) {
 	return string(jsonErrorsString), nil
 }
 
-func run(cfg Config) error {
+func run(ctx context.Context, cfg Config) error {
 	err := parseFlags(&cfg)
+	if err == ErrExitZero {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("incorrect flag usage: %w", err)
 	}
@@ -364,7 +346,7 @@ func run(cfg Config) error {
 		return fmt.Errorf("fzf is not in PATH. Please install fzf and add it to PATH to use fuzzy search mode")
 	}
 
-	cookies, cookieStoreErrors, err := getCookies(cfg.browser, cfg.domain, cfg.showExpired, cfg.debug)
+	cookies, cookieStoreErrors, err := getCookies(ctx, cfg.browser, cfg.domain, cfg.showExpired, cfg.debug)
 	if err != nil {
 		return fmt.Errorf("failed to obtain cookies: %w", err)
 	}
@@ -377,7 +359,7 @@ func run(cfg Config) error {
 	}
 
 	if cfg.fzfMode {
-		selectedCookie, err := fuzzyCookieSearch(cookies, cfg.debug)
+		selectedCookie, err := fuzzyCookieSearch(ctx, cookies, cfg.debug)
 		if err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) && exitErr.ExitCode() == 130 {
@@ -391,11 +373,11 @@ func run(cfg Config) error {
 	}
 
 	if cfg.name != "" {
-		cookie_value, err := getCookieValue(cookies, cfg.name)
+		cookieValue, err := getCookieValue(cookies, cfg.name)
 		if err != nil {
 			return fmt.Errorf("failed to get value for cookie %s: %w", cfg.name, err)
 		}
-		fmt.Println(cookie_value)
+		fmt.Println(cookieValue)
 
 	} else if cfg.curl {
 		fmt.Println(
@@ -419,8 +401,11 @@ func run(cfg Config) error {
 }
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
 	config := Config{}
-	if err := run(config); err != nil {
+	if err := run(ctx, config); err != nil {
 		log.Fatal(err)
 	}
 }

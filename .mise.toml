@@ -1,0 +1,4 @@
+[tools]
+go = "1.26.1"
+fzf = "0.70.0"
+golangci-lint = "v2.7.2"

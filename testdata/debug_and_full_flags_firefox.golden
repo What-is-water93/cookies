@@ -8,10 +8,21 @@ Debug: Store N Details:
 Debug: Reading cookies from Store N
 Debug: Store N returned 2 cookies
 Debug: Added 2 cookies from Store N
+Debug: Store N Details:
+  Browser: firefox
+  File: 
+  STAT_NORMALIZED
+Debug: Reading cookies from Store N
+Debug: Store N error: open /PATH/.mozilla/firefox/kooky.default/sessionstore-backups/recovery.jsonlz4: no such file or directory
+open /PATH/.mozilla/firefox/kooky.default/sessionstore-backups/recovery.baklz4: no such file or directory
+open /PATH/.mozilla/firefox/kooky.default/sessionstore.jsonlz4: no such file or directory
+open /PATH/.mozilla/firefox/kooky.default/sessionstore-backups/previous.jsonlz4: no such file or directory
 Debug: Total cookies found: 2, errors: N
 
 STDOUT:
-{}
+{
+  "1": "open /PATH/.mozilla/firefox/kooky.default/sessionstore-backups/recovery.jsonlz4: no such file or directory\nopen /PATH/.mozilla/firefox/kooky.default/sessionstore-backups/recovery.baklz4: no such file or directory\nopen /PATH/.mozilla/firefox/kooky.default/sessionstore.jsonlz4: no such file or directory\nopen /PATH/.mozilla/firefox/kooky.default/sessionstore-backups/previous.jsonlz4: no such file or directory"
+}
 {
   "another-cookie": {
     "Container": "",

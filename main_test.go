@@ -282,6 +282,10 @@ func normalizeCurlCommand(input string) string {
 func normalizeDebugOutput(input string) string {
 	output := input
 
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		output = strings.ReplaceAll(output, home, "/PATH")
+	}
+
 	re := regexp.MustCompile(`/[^\s]+/cookies\.sqlite`)
 	output = re.ReplaceAllString(output, "/PATH/cookies.sqlite")
 
@@ -319,7 +323,12 @@ func normalizeDebugJSON(t *testing.T, input string) string {
 		return input
 	}
 
+	home, _ := os.UserHomeDir()
+
 	for key, val := range data {
+		if home != "" {
+			val = strings.ReplaceAll(val, home, "/PATH")
+		}
 		re := regexp.MustCompile(`/[^\s:]+/(cookies\.sqlite|Cookies)`)
 		data[key] = re.ReplaceAllString(val, "/PATH/$1")
 	}

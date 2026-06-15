@@ -3,13 +3,13 @@ module github.com/What-is-water93/cookies
 go 1.26.1
 
 require (
-	github.com/browserutils/kooky v0.2.9
+	github.com/browserutils/kooky v0.2.10
 	github.com/sebdah/goldie/v2 v2.8.0
 	github.com/spf13/pflag v1.0.10
 )
 
 require (
-	github.com/go-sqlite/sqlite3 v0.0.0-20180313105335-53dd8e640ee7 // indirect
+	github.com/browserutils/sqlite3 v0.0.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gonuts/binary v0.2.0 // indirect
 	github.com/keybase/go-keychain v0.0.1 // indirect

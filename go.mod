@@ -5,7 +5,7 @@ go 1.26.1
 require (
 	github.com/browserutils/kooky v0.2.10
 	github.com/sebdah/goldie/v2 v2.8.0
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 )
 
 require (
